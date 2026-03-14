@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Orbital Simulator 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            font-size: 14px;
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            background: rgba(0,0,0,0.9);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 280px;
+        }
+
+        .control-group {
+            margin-bottom: 18px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #ccc;
+            font-weight: 500;
+        }
+
+        .slider-container {
+            position: relative;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin: 8px 0;
+            cursor: pointer;
+        }
+
+        .slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            border-radius: 2px;
+            transition: width 0.1s ease;
+        }
+
+        .slider-value {
+            position: absolute;
+            right: -45px;
+            top: -25px;
+            font-size: 12px;
+            color: #4facfe;
+            font-weight: 600;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 8px;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .body-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            max-width: 300px;
+            font-size: 13px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            color: #4facfe;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .spinner {
+            border: 3px solid rgba(79, 172, 254, 0.3);
+            border-top: 3px solid #4facfe;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            #ui-panel {
+                right: 0;
+                bottom: 0;
+                top: auto;
+                width: 100%;
+                border-radius: 0;
+                padding: 15px;
+            }
+            
+            #info {
+                font-size: 12px;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            Chargement du simulateur orbital...
+        </div>
+
+        <div id="info">
+            <div>WASD + Souris : Navigation</div>
+            <div>Shift/Ctrl : Vitesse caméra</div>
+            <div>R : Reset caméra</div>
+            <div>Space : Pause</div>
+        </div>
+
+        <div id="ui-panel">
+            <div class="control-group">
+                <label>Vitesse simulation <span id="timeScaleValue">1.0x</span></label>
+                <div class="slider-container" data-slider="timeScale">
+                    <div class="slider" id="timeScaleSlider"></div>
+                    <div class="slider-value" id="timeScaleDisplay">1.0</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>Zoom caméra <span id="cameraDistanceValue">1.0x</span></label>
+                <div class="slider-container" data-slider="cameraDistance">
+                    <div class="slider" id="cameraDistanceSlider"></div>
+                    <div class="slider-value" id="cameraDistanceDisplay">1.0</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>Trails <span id="trailLengthValue">1000</span></label>
+                <div class="slider-container" data-slider="trailLength">
+                    <div class="slider" id="trailLengthSlider"></div>
+                    <div class="slider-value" id="trailLengthDisplay">1000</div>
+                </div>
+            </div>
+            <button id="pauseBtn">⏸ Pause</button>
+            <button id="resetBtn">🔄 Reset</button>
+            <button id="exportBtn">📊 Exporter CSV</button>
+        </div>
+
+        <div id="bodyInfo" class="body-info" style="display: none;">
+            <div id="selectedBodyName">-</div>
+            <div>Distance: <span id="bodyDistance">-</span></div>
+            <div>Vitesse: <span id="bodyVelocity">-</span></div>
+            <div>Position: <span id="bodyPosition">-</span></div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        
+        import { initPhysics } from './src/physics.js';
+        import { createBodies, updateBodies } from './src/bodies.js';
+        import { setupControls } from './src/controls.js';
+        import { initShaders } from './src/shaders.js';
+        import { initUI } from './src/ui.js';
+        import { exportData } from './src/export.js';
+        import { loadTextures } from './src/textures.js';
+
+        class SpaceOrbitalSimulator {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1e10);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.clock = new THREE.Clock();
+                this.timeScale = 1.0;
+                this.isPaused = false;
+                this.bodies = [];
+                this.trails = [];
+                this.trailLength = 1000;
+                this.cameraDistance = 1.0;
+                
+                this.init();
+            }
+
+            async init() {
+                // Renderer setup
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.2;
+                document.getElementById('canvas-container').appendChild(this.renderer.domElement);
+
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+
+                // Load textures
+                const textures = await loadTextures();
+
+                // Physics
+                await initPhysics();
+
+                // Create celestial bodies
+                this.bodies = await createBodies(this.scene, textures);
+
+                // Shaders and atmosphere
+                initShaders(this.scene, textures);
+
+                // Post-processing
+                this.setupPostProcessing();
+
+                // Controls
+                this.controls = setupControls(this.camera, this.renderer.domElement, this.bodies);
+
+                // UI
+                initUI(this);
+
+                // Stars background
+                this.createStarField();
+
+                // Event listeners
+                this.setupEventListeners();
+
+                // Start animation
+                this.animate();
+            }
+
+            setupPostProcessing() {
+                this.composer = new EffectComposer(this.renderer);
+                const renderPass = new RenderPass(this.scene, this.camera);
+                this.composer.addPass(renderPass);
+
+                const bloomPass = new UnrealBloomPass(
+                    new THREE.Vector2(window.innerWidth, window.innerHeight),
+                    0.8, 0.4, 0.85
+                );
+                this.composer.addPass(bloomPass);
+            }
+
+            createStarField() {
+                const starsGeometry = new THREE.BufferGeometry();
+                const starsCount = 50000;
+                const positions = new Float32Array(starsCount * 3);
+
+                for (let i = 0; i < starsCount * 3; i += 3) {
+                    positions[i] = (Math.random() - 0.5) * 4000;
+                    positions[i + 1] = (Math.random() - 0.5) * 4000;
+                    positions[i + 2] = (Math.random() - 0.5) * 4000;
+                }
+
+                starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const starsMaterial = new THREE.PointsMaterial({
+                    color: 0xffffff,
+                    size: 2,
+                    sizeAttenuation: false
+                });
+                const stars = new THREE.Points(starsGeometry, starsMaterial);
+                this.scene.add(stars);
+            }
+
+            setupEventListeners() {
+                window.addEventListener('resize', () => this.onWindowResize());
+                
+                // Mouse picking for body info
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                
+                this.renderer.domElement.addEventListener('click', (event) => {
+                    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                    
+                    this.raycaster.setFromCamera(this.mouse, this.camera);
+                    const intersects = this.raycaster.intersectObjects(this.bodies.map(b => b.mesh));
+                    
+                    if (intersects.length > 0) {
+                        const body = intersects[0].object.userData.body;
+                        this.showBodyInfo(body);
+                    }
+                });
+            }
+
+            showBodyInfo(body) {
+                const infoEl = document.getElementById('bodyInfo');
+                infoEl.style.display = 'block';
+                document.getElementById('selectedBodyName').textContent = body.name;
+                document.getElementById('bodyDistance').textContent = `${(body.position.length()).toLocaleString()} km`;
+                document.getElementById('bodyVelocity').textContent = `${(body.velocity.length() * 1000).toFixed(0)} m/s`;
+                document.getElementById('bodyPosition').textContent = 
+                    `x:${body.position.x.toFixed(0)} y:${body.position.y.toFixed(0)} z:${body.position.z.toFixed(0)}`;
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                const deltaTime = Math.min(this.clock.getDelta(), 0.1) * this.timeScale;
+                
+                if (!this.isPaused) {
+                    updateBodies(this.bodies, deltaTime);
+                    this.updateTrails(deltaTime);
+                }
+
+                this.controls.update();
+                this.composer.render();
+            }
+
+            updateTrails(deltaTime) {
+                this.bodies.forEach((body, index) => {
+                    if (!body.trail) {
+                        body.trail = {
+                            positions: [],
+                            geometry: new THREE.BufferGeometry(),
+                            material: new THREE.LineBasicMaterial({
+                                color: body.color,
+                                transparent: true,
+                                opacity: 0.6
+                            }),
+                            line: null
+                        };
+                        this.trails.push(body.trail);
+                    }
+
+                    body.trail.positions.push(body.position.clone());
+                    if (body.trail.positions.length > this.trailLength) {
+                        body.trail.positions.shift();
+                    }
+
+                    body.trail.geometry.setFromPoints(body.trail.positions);
+                    
+                    if (!body.trail.line) {
+                        body.trail.line = new THREE.Line(body.trail.geometry, body.trail.material);
+                        this.scene.add(body.trail.line);
+                    } else {
+                        body.trail.line.geometry = body.trail.geometry;
+                    }
+                });
+            }
+
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.composer.setSize(window.innerWidth, window.innerHeight);
+            }
+        }
+
+        // Initialize simulator
+        window.simulator = new SpaceOrbitalSimulator();
+    </script>
+</body>
+</html>
